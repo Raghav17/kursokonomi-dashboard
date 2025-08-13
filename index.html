@@ -9,15 +9,10 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
     />
-    <!-- React & ReactDOM (UMD builds) -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel for JSX transpilation in the browser -->
-    <script src="https://unpkg.com/babel-standalone@6.26.0/babel.min.js"></script>
-    <!-- Recharts (UMD) -->
-    <script src="https://cdn.jsdelivr.net/npm/recharts/umd/Recharts.min.js"></script>
+    <!-- Chart.js for charts (vanilla JS library) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-      /* Custom styles for glassy cards */
+      /* Glassy card style without @apply */
       .glass-card {
         backdrop-filter: blur(12px);
         background-color: rgba(255, 255, 255, 0.8);
@@ -28,36 +23,157 @@
     </style>
   </head>
   <body class="bg-gradient-to-b from-blue-50 to-white min-h-screen">
-    <div id="root"></div>
-    <script type="text/babel" data-presets="env,react">
-      // Pull hooks from the React global
-      const { useState } = React;
-
-      // Pull required chart components from the Recharts global
-      const {
-        BarChart,
-        Bar,
-        CartesianGrid,
-        XAxis,
-        YAxis,
-        Tooltip,
-        Legend,
-      } = Recharts;
-
-      function formatNumber(num) {
-        return new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(num);
+    <div class="container mx-auto px-4 py-8">
+      <h1 class="text-3xl font-bold text-center mb-8">Kalkulator for kursøkonomi</h1>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Input section -->
+        <div class="glass-card">
+          <h2 class="text-xl font-semibold mb-4">Inndata</h2>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">Annonsebudsjett (kr):</label>
+              <input
+                id="adsBudget"
+                type="number"
+                class="w-full p-2 border rounded"
+                value="50000"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Kurspris (kr):</label>
+              <input
+                id="coursePrice"
+                type="number"
+                class="w-full p-2 border rounded"
+                value="3990"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Unike klikk:</label>
+              <input
+                id="uniqueClicks"
+                type="number"
+                class="w-full p-2 border rounded"
+                value="1200"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Leads (registreringer):</label>
+              <input
+                id="leads"
+                type="number"
+                class="w-full p-2 border rounded"
+                value="600"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Oppmøteprosent (%):</label>
+              <input
+                id="showUpRate"
+                type="number"
+                class="w-full p-2 border rounded"
+                value="35"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Kjøpsprosent (%):</label>
+              <input
+                id="purchaseRate"
+                type="number"
+                class="w-full p-2 border rounded"
+                value="8"
+              />
+            </div>
+          </div>
+        </div>
+        <!-- Output section -->
+        <div class="glass-card">
+          <h2 class="text-xl font-semibold mb-4">Resultater</h2>
+          <ul class="space-y-2 text-sm">
+            <li><strong>Konvertering landingsside:</strong> <span id="conversionRate">0%</span></li>
+            <li><strong>CPL (kostnad per registrering):</strong> <span id="cpl">0 kr</span></li>
+            <li><strong>Antall salg:</strong> <span id="salesCount">0</span></li>
+            <li><strong>Omsetning:</strong> <span id="revenue">0 kr</span></li>
+            <li><strong>ROAS:</strong> <span id="roas">0%</span></li>
+            <li><strong>Dekningsbidrag:</strong> <span id="coverageContribution">0 kr</span></li>
+            <li><strong>Maks tolerert CPL (break-even):</strong> <span id="breakEvenCpl">0 kr</span></li>
+            <li><strong>Leads til break-even:</strong> <span id="leadsForBreakeven">0</span></li>
+          </ul>
+        </div>
+      </div>
+      <!-- Charts -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <div class="glass-card">
+          <h2 class="text-xl font-semibold mb-4">Funnel</h2>
+          <canvas id="funnelChart" width="400" height="300"></canvas>
+        </div>
+        <div class="glass-card">
+          <h2 class="text-xl font-semibold mb-4">Budsjett vs omsetning</h2>
+          <canvas id="revenueChart" width="400" height="300"></canvas>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Helper to format numbers in Norwegian locale
+      function formatNumber(num, decimals = 0) {
+        return new Intl.NumberFormat('nb-NO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
       }
 
-      function Dashboard() {
-        // Initial defaults
-        const [adsBudget, setAdsBudget] = useState(50000);
-        const [coursePrice, setCoursePrice] = useState(3990);
-        const [uniqueClicks, setUniqueClicks] = useState(1200);
-        const [leads, setLeads] = useState(600);
-        const [showUpRate, setShowUpRate] = useState(35);
-        const [purchaseRate, setPurchaseRate] = useState(8);
+      // Initialize charts
+      const funnelCtx = document.getElementById('funnelChart').getContext('2d');
+      const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+      const funnelChart = new Chart(funnelCtx, {
+        type: 'bar',
+        data: {
+          labels: ['Unike klikk', 'Leads', 'Oppmøte', 'Salg'],
+          datasets: [
+            {
+              label: 'Antall',
+              backgroundColor: ['#3b82f6', '#3b82f6', '#3b82f6', '#3b82f6'],
+              borderColor: '#3b82f6',
+              borderWidth: 1,
+              data: [0, 0, 0, 0],
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true },
+          },
+        },
+      });
+      const revenueChart = new Chart(revenueCtx, {
+        type: 'bar',
+        data: {
+          labels: ['Budsjett', 'Omsetning'],
+          datasets: [
+            {
+              label: 'Beløp',
+              backgroundColor: ['#f59e0b', '#10b981'],
+              borderColor: ['#f59e0b', '#10b981'],
+              borderWidth: 1,
+              data: [0, 0],
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true },
+          },
+        },
+      });
 
-        // Derived metrics
+      // Function to compute and update all values
+      function updateDashboard() {
+        const adsBudget = parseFloat(document.getElementById('adsBudget').value) || 0;
+        const coursePrice = parseFloat(document.getElementById('coursePrice').value) || 0;
+        const uniqueClicks = parseFloat(document.getElementById('uniqueClicks').value) || 0;
+        const leads = parseFloat(document.getElementById('leads').value) || 0;
+        const showUpRate = parseFloat(document.getElementById('showUpRate').value) || 0;
+        const purchaseRate = parseFloat(document.getElementById('purchaseRate').value) || 0;
+
         const conversionRate = uniqueClicks > 0 ? (leads / uniqueClicks) * 100 : 0;
         const cpl = leads > 0 ? adsBudget / leads : 0;
         const salesCount = leads * (showUpRate / 100) * (purchaseRate / 100);
@@ -67,128 +183,30 @@
         const leadsForBreakeven = breakEvenCpl > 0 ? adsBudget / breakEvenCpl : 0;
         const coverageContribution = revenue - adsBudget;
 
-        // Chart data
-        const funnelData = [
-          { name: 'Unike klikk', value: uniqueClicks },
-          { name: 'Leads', value: leads },
-          { name: 'Oppmøte', value: leads * (showUpRate / 100) },
-          { name: 'Salg', value: salesCount },
-        ];
-        const revenueData = [
-          { name: 'Budsjett vs omsetning', budget: adsBudget, omsetning: revenue },
-        ];
+        // Update text outputs
+        document.getElementById('conversionRate').innerText = conversionRate.toFixed(2) + '%';
+        document.getElementById('cpl').innerText = formatNumber(cpl, 2) + ' kr';
+        document.getElementById('salesCount').innerText = formatNumber(salesCount);
+        document.getElementById('revenue').innerText = formatNumber(revenue) + ' kr';
+        document.getElementById('roas').innerText = roas.toFixed(1) + '%';
+        document.getElementById('coverageContribution').innerText = formatNumber(coverageContribution) + ' kr';
+        document.getElementById('breakEvenCpl').innerText = formatNumber(breakEvenCpl, 2) + ' kr';
+        document.getElementById('leadsForBreakeven').innerText = formatNumber(leadsForBreakeven);
 
-        return (
-          <div className="container mx-auto px-4 py-8">
-            <h1 className="text-3xl font-bold text-center mb-8">Kalkulator for kursøkonomi</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Input section */}
-              <div className="glass-card">
-                <h2 className="text-xl font-semibold mb-4">Inndata</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Annonsebudsjett (kr):</label>
-                    <input
-                      type="number"
-                      className="w-full p-2 border rounded"
-                      value={adsBudget}
-                      onChange={(e) => setAdsBudget(Number(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Kurspris (kr):</label>
-                    <input
-                      type="number"
-                      className="w-full p-2 border rounded"
-                      value={coursePrice}
-                      onChange={(e) => setCoursePrice(Number(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Unike klikk:</label>
-                    <input
-                      type="number"
-                      className="w-full p-2 border rounded"
-                      value={uniqueClicks}
-                      onChange={(e) => setUniqueClicks(Number(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Leads (registreringer):</label>
-                    <input
-                      type="number"
-                      className="w-full p-2 border rounded"
-                      value={leads}
-                      onChange={(e) => setLeads(Number(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Oppmøteprosent (%):</label>
-                    <input
-                      type="number"
-                      className="w-full p-2 border rounded"
-                      value={showUpRate}
-                      onChange={(e) => setShowUpRate(Number(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Kjøpsprosent (%):</label>
-                    <input
-                      type="number"
-                      className="w-full p-2 border rounded"
-                      value={purchaseRate}
-                      onChange={(e) => setPurchaseRate(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              </div>
-              {/* Outputs */}
-              <div className="glass-card">
-                <h2 className="text-xl font-semibold mb-4">Resultater</h2>
-                <ul className="space-y-2">
-                  <li><strong>Konvertering landingsside:</strong> {conversionRate.toFixed(2)}%</li>
-                  <li><strong>CPL (kostnad per registrering):</strong> {formatNumber(cpl.toFixed(2))} kr</li>
-                  <li><strong>Antall salg:</strong> {formatNumber(salesCount.toFixed(0))}</li>
-                  <li><strong>Omsetning:</strong> {formatNumber(revenue.toFixed(0))} kr</li>
-                  <li><strong>ROAS:</strong> {roas.toFixed(1)}%</li>
-                  <li><strong>Dekningsbidrag:</strong> {formatNumber(coverageContribution.toFixed(0))} kr</li>
-                  <li><strong>Maks tolerert CPL (break-even):</strong> {formatNumber(breakEvenCpl.toFixed(2))} kr</li>
-                  <li><strong>Leads til break-even:</strong> {formatNumber(leadsForBreakeven.toFixed(0))}</li>
-                </ul>
-              </div>
-            </div>
-            {/* Charts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-              <div className="glass-card">
-                <h2 className="text-xl font-semibold mb-4">Funnel</h2>
-                <BarChart width={400} height={300} data={funnelData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="value" name="Antall" fill="#3b82f6" />
-                </BarChart>
-              </div>
-              <div className="glass-card">
-                <h2 className="text-xl font-semibold mb-4">Budsjett vs omsetning</h2>
-                <BarChart width={400} height={300} data={revenueData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="budget" name="Budsjett" fill="#f59e0b" />
-                  <Bar dataKey="omsetning" name="Omsetning" fill="#10b981" />
-                </BarChart>
-              </div>
-            </div>
-          </div>
-        );
+        // Update funnel chart
+        funnelChart.data.datasets[0].data = [uniqueClicks, leads, leads * (showUpRate / 100), salesCount];
+        funnelChart.update();
+        // Update revenue chart
+        revenueChart.data.datasets[0].data = [adsBudget, revenue];
+        revenueChart.update();
       }
 
-      // Render the dashboard
-      ReactDOM.render(<Dashboard />, document.getElementById('root'));
+      // Attach event listeners to inputs
+      ['adsBudget', 'coursePrice', 'uniqueClicks', 'leads', 'showUpRate', 'purchaseRate'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', updateDashboard);
+      });
+      // Initial update on page load
+      updateDashboard();
     </script>
   </body>
 </html>
