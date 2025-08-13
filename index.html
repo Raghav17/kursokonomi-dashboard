@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalkulator for kursøkonomi</title>
+    <!-- Tailwind CSS via CDN -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+    />
+    <!-- React & ReactDOM (UMD builds) -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX transpilation in the browser -->
+    <script src="https://unpkg.com/babel-standalone@6.26.0/babel.min.js"></script>
+    <!-- Recharts (UMD) -->
+    <script src="https://cdn.jsdelivr.net/npm/recharts/umd/Recharts.min.js"></script>
+    <style>
+      /* Custom styles for glassy cards */
+      .glass-card {
+        @apply backdrop-blur-lg bg-white bg-opacity-80 rounded-xl shadow-md p-4;
+      }
+    </style>
+  </head>
+  <body class="bg-gradient-to-b from-blue-50 to-white min-h-screen">
+    <div id="root"></div>
+    <script type="text/babel">
+      // Pull hooks from the React global
+      const { useState } = React;
+
+      // Pull required chart components from the Recharts global
+      const {
+        BarChart,
+        Bar,
+        CartesianGrid,
+        XAxis,
+        YAxis,
+        Tooltip,
+        Legend,
+      } = Recharts;
+
+      function formatNumber(num) {
+        return new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(num);
+      }
+
+      function Dashboard() {
+        // Initial defaults
+        const [adsBudget, setAdsBudget] = useState(50000);
+        const [coursePrice, setCoursePrice] = useState(3990);
+        const [uniqueClicks, setUniqueClicks] = useState(1200);
+        const [leads, setLeads] = useState(600);
+        const [showUpRate, setShowUpRate] = useState(35);
+        const [purchaseRate, setPurchaseRate] = useState(8);
+
+        // Derived metrics
+        const conversionRate = uniqueClicks > 0 ? (leads / uniqueClicks) * 100 : 0;
+        const cpl = leads > 0 ? adsBudget / leads : 0;
+        const salesCount = leads * (showUpRate / 100) * (purchaseRate / 100);
+        const revenue = salesCount * coursePrice;
+        const roas = adsBudget > 0 ? (revenue / adsBudget) * 100 : 0;
+        const breakEvenCpl = coursePrice * (showUpRate / 100) * (purchaseRate / 100);
+        const leadsForBreakeven = breakEvenCpl > 0 ? adsBudget / breakEvenCpl : 0;
+        const coverageContribution = revenue - adsBudget;
+
+        // Chart data
+        const funnelData = [
+          { name: 'Unike klikk', value: uniqueClicks },
+          { name: 'Leads', value: leads },
+          { name: 'Oppmøte', value: leads * (showUpRate / 100) },
+          { name: 'Salg', value: salesCount },
+        ];
+        const revenueData = [
+          { name: 'Budsjett vs omsetning', budget: adsBudget, omsetning: revenue },
+        ];
+
+        return (
+          <div className="container mx-auto px-4 py-8">
+            <h1 className="text-3xl font-bold text-center mb-8">Kalkulator for kursøkonomi</h1>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Input section */}
+              <div className="glass-card">
+                <h2 className="text-xl font-semibold mb-4">Inndata</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Annonsebudsjett (kr):</label>
+                    <input
+                      type="number"
+                      className="w-full p-2 border rounded"
+                      value={adsBudget}
+                      onChange={(e) => setAdsBudget(Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Kurspris (kr):</label>
+                    <input
+                      type="number"
+                      className="w-full p-2 border rounded"
+                      value={coursePrice}
+                      onChange={(e) => setCoursePrice(Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Unike klikk:</label>
+                    <input
+                      type="number"
+                      className="w-full p-2 border rounded"
+                      value={uniqueClicks}
+                      onChange={(e) => setUniqueClicks(Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Leads (registreringer):</label>
+                    <input
+                      type="number"
+                      className="w-full p-2 border rounded"
+                      value={leads}
+                      onChange={(e) => setLeads(Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Oppmøteprosent (%):</label>
+                    <input
+                      type="number"
+                      className="w-full p-2 border rounded"
+                      value={showUpRate}
+                      onChange={(e) => setShowUpRate(Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Kjøpsprosent (%):</label>
+                    <input
+                      type="number"
+                      className="w-full p-2 border rounded"
+                      value={purchaseRate}
+                      onChange={(e) => setPurchaseRate(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </div>
+              {/* Outputs */}
+              <div className="glass-card">
+                <h2 className="text-xl font-semibold mb-4">Resultater</h2>
+                <ul className="space-y-2">
+                  <li><strong>Konvertering landingsside:</strong> {conversionRate.toFixed(2)}%</li>
+                  <li><strong>CPL (kostnad per registrering):</strong> {formatNumber(cpl.toFixed(2))} kr</li>
+                  <li><strong>Antall salg:</strong> {formatNumber(salesCount.toFixed(0))}</li>
+                  <li><strong>Omsetning:</strong> {formatNumber(revenue.toFixed(0))} kr</li>
+                  <li><strong>ROAS:</strong> {roas.toFixed(1)}%</li>
+                  <li><strong>Dekningsbidrag:</strong> {formatNumber(coverageContribution.toFixed(0))} kr</li>
+                  <li><strong>Maks tolerert CPL (break-even):</strong> {formatNumber(breakEvenCpl.toFixed(2))} kr</li>
+                  <li><strong>Leads til break-even:</strong> {formatNumber(leadsForBreakeven.toFixed(0))}</li>
+                </ul>
+              </div>
+            </div>
+            {/* Charts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+              <div className="glass-card">
+                <h2 className="text-xl font-semibold mb-4">Funnel</h2>
+                <BarChart width={400} height={300} data={funnelData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="value" name="Antall" fill="#3b82f6" />
+                </BarChart>
+              </div>
+              <div className="glass-card">
+                <h2 className="text-xl font-semibold mb-4">Budsjett vs omsetning</h2>
+                <BarChart width={400} height={300} data={revenueData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="budget" name="Budsjett" fill="#f59e0b" />
+                  <Bar dataKey="omsetning" name="Omsetning" fill="#10b981" />
+                </BarChart>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Render the dashboard
+      ReactDOM.render(<Dashboard />, document.getElementById('root'));
+    </script>
+  </body>
+</html>
